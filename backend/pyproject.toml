@@ -1,0 +1,43 @@
+[project]
+name = "deep-research"
+version = "0.1.0"
+description = "AI 驱动的自动化深度研究系统 — 输入问题，输出结构化研究报告"
+readme = {file = "../README.md", content-type = "text/markdown"}
+requires-python = ">=3.9"
+
+authors = [
+    {name = "Deep Research Team"},
+]
+
+license = {text = "MIT"}
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+    "fastapi>=0.128",
+    "uvicorn>=0.39",
+    "langgraph>=0.6",
+    "langchain-core>=0.3",
+    "langchain-openai>=0.3",
+    "qdrant-client>=1.16",
+    "sentence-transformers>=5.1",
+    "tavily>=1.1",
+    "pydantic>=2.13",
+    "python-dotenv>=1.2",
+    "httpx>=0.28",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4",
+    "pytest-asyncio>=1.2",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["../test"]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"
