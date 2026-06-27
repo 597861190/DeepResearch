@@ -76,6 +76,11 @@ async def main():
 
     state = ResearchState(
         query="agent的发展前景",
+        user_id="cli",
+        session_id="cli_session",
+        intent="",
+        private_context="",
+        messages=[],
         plan=[],
         current_task_idx=0,
         facts=[],
@@ -85,9 +90,6 @@ async def main():
         completed_tasks=0,
         failed_tasks=[],
         avg_fact_length=0.0,
-        intent="",
-        private_context="",
-        messages=[],
         qa_score=0.0,
         qa_suggestions=[],
         refine_count=0,

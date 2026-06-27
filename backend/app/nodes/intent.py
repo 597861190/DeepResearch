@@ -23,14 +23,35 @@ SYSTEM_PROMPT = """
 
 async def intent_node(state: ResearchState) -> dict:
     user_input = state.get("query", "")
-    logger.info("🔍 意图识别开始，用户输入=%s", user_input)
+    session_id = state.get("session_id", "")
+    messages = state.get("messages", [])
+
+    logger.info("🔍 意图识别开始，用户输入=%s (session=%s)", user_input, session_id)
+
+    # 构建 prompt：如果有会话历史，附加上下文
+    context_parts = [SYSTEM_PROMPT]
+    if messages:
+        # 取最近 2 轮的历史作为上下文
+        recent = messages[-4:]
+        history_lines = []
+        for msg in recent:
+            role = getattr(msg, "type", "unknown")
+            content = getattr(msg, "content", "")
+            if content:
+                history_lines.append(f"[{role}] {content[:200]}")
+        if history_lines:
+            context_parts.append("\n## 对话历史（供参考）\n" + "\n".join(history_lines))
+            logger.info("📜 携带 %d 条历史消息作为上下文", len(history_lines))
+
+    context_parts.append(f"\n## 当前用户输入\n{user_input}")
+    full_prompt = "\n".join(context_parts)
 
     llm = _get_llm()
 
     try:
         response = await llm.ainvoke([
             SystemMessage(content=SYSTEM_PROMPT),
-            HumanMessage(content=user_input),
+            HumanMessage(content=full_prompt),
         ])
         result = json.loads(response.content)
         intent_str = result.get("intent", IntentType.AMBIGUOUS.value)

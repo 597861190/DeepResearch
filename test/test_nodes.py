@@ -30,6 +30,8 @@ def make_state(**overrides) -> ResearchState:
     """创建基础 ResearchState，允许覆盖。"""
     defaults = dict(
         query="",
+        user_id="",
+        session_id="",
         intent="",
         messages=[],
         plan=[],

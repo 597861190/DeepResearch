@@ -5,6 +5,11 @@ from langgraph.graph.message import add_messages
 
 
 class ResearchState(TypedDict):
+    # ── 用户与会话标识（用于跨请求关联） ──
+    # 用户 ID，同一用户的多次研究可关联
+    user_id: str
+    # 当前会话 ID，用于多轮对话上下文
+    session_id: str
     # 研究问题
     query: str
     # 意图分类结果

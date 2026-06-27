@@ -17,6 +17,8 @@ from app.state import ResearchState
 
 BASE_STATE = {
     "query": "test",
+    "user_id": "",
+    "session_id": "",
     "intent": "deep_research",
     "private_context": "",
     "messages": [],

@@ -35,6 +35,34 @@ logger = logging.getLogger("api")
 # ── 内存任务存储 ──────────────────────────────────────────────
 tasks_store: dict[str, dict] = {}
 
+# ── 会话记忆存储（user_id + session_id → 历史消息） ────────────
+sessions_store: dict[tuple[str, str], list] = {}
+MAX_SESSION_HISTORY = 10  # 每个 session 最多保留 10 轮对话
+
+
+def _save_session_memory(
+    session_key: tuple[str, str],
+    query: str,
+    report_md: str,
+    prev_history: list,
+) -> None:
+    """将本次研究的 query + report 追加到会话记忆。"""
+    from langchain_core.messages import AIMessage, HumanMessage
+
+    new_entries = [
+        HumanMessage(content=f"用户问题：{query}"),
+        AIMessage(content=report_md[:2000] if report_md else "（研究未能生成报告）"),
+    ]
+    updated = prev_history + new_entries
+    # 限制历史长度，防止无限增长
+    sessions_store[session_key] = updated[-MAX_SESSION_HISTORY * 2:]
+    logger.info(
+        "💬 会话记忆已更新（%s），共 %d 条消息",
+        session_key,
+        len(sessions_store[session_key]),
+    )
+
+
 # 已完成任务的保留时间（超过此时间后被清理）
 TASK_RETENTION_SECONDS = 3600  # 1 小时
 _CLEANUP_INTERVAL_SECONDS = 300  # 每 5 分钟清理一次
@@ -119,6 +147,8 @@ app = FastAPI(title="Deep Research API", version="1.0.0", lifespan=lifespan)
 
 class ResearchRequest(BaseModel):
     query: str
+    user_id: str = "anonymous"
+    session_id: str = "default"
     thread_id: str = "default"
 
 
@@ -167,10 +197,13 @@ async def start_research(req: ResearchRequest):
     }
     tasks_store[request_id] = task_record
 
-    logger.info("📩 收到研究请求: query=%s", req.query)
+    logger.info("📩 收到研究请求: query=%s (user=%s, session=%s)",
+                req.query, req.user_id, req.session_id)
 
     # 后台异步执行，不阻塞 HTTP 响应
-    asyncio.create_task(_run_research(request_id, req.query, req.thread_id))
+    asyncio.create_task(_run_research(
+        request_id, req.query, req.thread_id, req.user_id, req.session_id,
+    ))
 
     return ResearchResponse(
         request_id=request_id,
@@ -202,15 +235,31 @@ async def get_research(request_id: str):
 # ── 后台研究执行 ──────────────────────────────────────────────
 
 
-async def _run_research(request_id: str, query: str, thread_id: str) -> None:
-    """后台执行 LangGraph 管线，结果写入 tasks_store。"""
+async def _run_research(
+    request_id: str,
+    query: str,
+    thread_id: str,
+    user_id: str = "anonymous",
+    session_id: str = "default",
+) -> None:
+    """后台执行 LangGraph 管线，结果写入 tasks_store。
+
+    支持会话记忆：自动从 sessions_store 加载同 session 的历史消息，
+    执行完成后将本次研究结果追加回会话记忆。
+    """
     # 为后台任务注入日志上下文
     _inject_log_context(request_id, thread_id)
 
+    # ── 加载会话历史（同一 user + session 的过往研究记录） ──
+    session_key = (user_id, session_id)
+    session_history = list(sessions_store.get(session_key, []))
+
     state = ResearchState(
         query=query,
+        user_id=user_id,
+        session_id=session_id,
         intent="",
-        messages=[],
+        messages=session_history,  # 带上历史消息
         plan=[],
         current_task_idx=0,
         facts=[],
@@ -261,6 +310,15 @@ async def _run_research(request_id: str, query: str, thread_id: str) -> None:
             "✅ 研究完成: facts=%d, reflect=%d 轮",
             len(final_state.get("facts", [])),
             final_state.get("reflect_count", 0),
+        )
+
+        # ── 将会话更新写入 sessions_store（持久化对话记忆） ──
+        report_md = final_state.get("report_md", "")
+        _save_session_memory(
+            session_key=session_key,
+            query=query,
+            report_md=report_md,
+            prev_history=session_history,
         )
 
     except Exception as e:
