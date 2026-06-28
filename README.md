@@ -29,13 +29,27 @@ graph TD
 - Docker（用于 Qdrant 向量数据库）
 - API Key：[DeepSeek](https://platform.deepseek.com/) + [Tavily](https://tavily.com/)
 
-### 1. 启动 Qdrant
+### 1. 一键启动（推荐）
+
+```bash
+# 配置 API Key（编辑 backend/.env 填入密钥）
+# 然后一条命令启动所有服务
+docker compose up -d
+
+# 查看日志
+docker compose logs -f
+
+# 停止
+docker compose down
+```
+
+### 2. 或手动启动 Qdrant
 
 ```bash
 docker run -d -p 6333:6333 qdrant/qdrant
 ```
 
-### 2. 配置环境变量
+### 3. 配置环境变量
 
 ```bash
 cp backend/.env.example backend/.env
